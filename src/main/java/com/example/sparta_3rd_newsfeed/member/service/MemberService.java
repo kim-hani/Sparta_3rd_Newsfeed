@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import java.util.regex.Matcher;
@@ -48,14 +50,6 @@ public class MemberService {
             }
 
 
-        // 비밀번호 형식 검증 (8~16자, 영문자, 숫자, 특수문자 각 1개 이상)
-            String passwordRegex = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]).{8,16}$";
-            Pattern pattern = Pattern.compile(passwordRegex);
-            Matcher matcher = pattern.matcher(updateRequestDto.getNewPassword());
-            if (!matcher.matches()) {
-                throw new IllegalArgumentException("새 비밀번호는 8~16자, 영문자, 숫자, 특수문자가 각각 1개 이상 포함되어야 합니다.");
-            }
-
             // 비밀번호 변경
             String encodedPassword = passwordEncoder.encode(updateRequestDto.getNewPassword());
             member.setPassword(encodedPassword);
@@ -71,7 +65,7 @@ public class MemberService {
 
         // 5. 프로필 이미지 수정
         if (updateRequestDto.getProfileImg() != null) {
-            member.setProfileImgId(updateRequestDto.getProfileImg());
+            member.setProfileImg(updateRequestDto.getProfileImg());
         }
 
         // 6. 수정된 회원 저장
@@ -80,32 +74,46 @@ public class MemberService {
 
 
     public SignUpResponseDto signUp(SignUpRequestDto signUpRequestDto) {
+
         // 활성화된 계정이 있는지 확인
-        Optional<Member> existingMember = memberRepository.findByEmailAndIsDeletedFalse(signUpRequestDto.getEmail());
+        Optional<Member> existingMember = memberRepository.findByEmail(signUpRequestDto.getEmail());
 
         if (existingMember.isPresent()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 사용중인 이메일 입니다.");
+            Member member = existingMember.get();
+
+            // 탈퇴한 계정이지만 탈퇴한 지 1달이 지나지 않은 계정일 경우
+            if(member.isDeleted() && member.getDeletedAt() != null){
+                LocalDateTime oneMonthAgo = LocalDateTime.now().minusMonths(1);
+                if(member.getDeletedAt().isAfter(oneMonthAgo)){
+                    member.setDeleted(false);
+                    member.setDeletedAt(null);
+                    member.setUsername(signUpRequestDto.getUsername());
+
+                    if(signUpRequestDto.getProfileImg() != null){
+                        member.setProfileImg(signUpRequestDto.getProfileImg());
+                    }
+
+                    if(signUpRequestDto.getProfileBio() != null){
+                        member.setProfileBio(signUpRequestDto.getProfileBio());
+                    }
+
+                    member.setPassword(passwordEncoder.encode(signUpRequestDto.getPassword()));
+
+                    memberRepository.save(member);
+                    return new SignUpResponseDto(member.getUsername(),member.getEmail());
+                }else{
+
+                    // 1달이 지났으면 계정 완전히 삭제 후 신규가입
+                    memberRepository.delete(member);
+                }
+            }else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 사용중인 이메일 입니다.");
+            }
         }
 
         // 비밀번호 유효성 검사
         if (!signUpRequestDto.getPassword().matches("(?=.*[0-9])(?=.*[a-zA-Z])(?=.*\\W)(?=\\S+$).{8,16}")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호는 8~16자 영문 대소문자, 숫자, 특수문자를 포함해야 합니다.");
-        }
-
-        // 기존 탈퇴한 회원이 있는지 확인
-        Optional<Member> deletedMember = memberRepository.findByEmail(signUpRequestDto.getEmail());
-
-        if (deletedMember.isPresent()) {
-            // 기존 계정을 재활성화
-            Member member = deletedMember.get();
-            member.setDeleted(false); // 계정 활성화
-            member.setPassword(passwordEncoder.encode(signUpRequestDto.getPassword())); // 비밀번호 재설정
-            member.setUsername(signUpRequestDto.getUsername());
-            member.setProfileImg(signUpRequestDto.getProfileImg());
-            member.setProfileBio(signUpRequestDto.getProfileBio());
-            memberRepository.save(member);
-
-            return new SignUpResponseDto(member.getUsername(), member.getEmail());
         }
 
         // 신규 회원가입 처리
@@ -126,6 +134,12 @@ public class MemberService {
         Member member = memberRepository.findByEmail(loginRequestDto.getEmail())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일이나 비밀번호가 일치하지 않습니다."));
 
+        // 탈퇴한 계정인지 확인
+        if (member.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이미 탈퇴한 계정입니다. 다시 가입해주세요.");
+        }
+
+        // 비밀번호 일치 여부 확인
         if (!passwordEncoder.matches(loginRequestDto.getPassword(), member.getPassword())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일이나 비밀번호가 일치하지 않습니다.");
         }
@@ -138,11 +152,17 @@ public class MemberService {
         Member member = memberRepository.findByEmail(requestDto.getEmail())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,"이메일이나 비밀번호가 일치하지 않습니다."));
 
+        if(member.isDeleted()){
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"이메일이나 비밀번호가 일치하지 않습니다.");
+        }
+
+        // 비밀번호 일치 여부 확인
         if (!passwordEncoder.matches(requestDto.getPassword(), member.getPassword())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일이나 비밀번호가 일치하지 않습니다.");
         }
 
         member.setDeleted(true);
+        member.setDeletedAt(LocalDateTime.now());
         memberRepository.save(member);
     }
 }

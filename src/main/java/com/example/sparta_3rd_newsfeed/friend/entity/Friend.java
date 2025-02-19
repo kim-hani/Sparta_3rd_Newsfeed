@@ -1,6 +1,6 @@
 package com.example.sparta_3rd_newsfeed.friend.entity;
 
-import com.example.sparta_3rd_newsfeed.Member;
+import com.example.sparta_3rd_newsfeed.member.entity.Member;
 import com.example.sparta_3rd_newsfeed.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;

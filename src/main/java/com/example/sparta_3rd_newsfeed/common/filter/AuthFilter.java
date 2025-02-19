@@ -22,6 +22,15 @@ public class AuthFilter implements Filter {
         // 회원가입 및 로그인 요청은 필터에서 제외
         String requestURI = httpRequest.getRequestURI();
 
+        if (requestURI.startsWith("/swagger-ui") ||
+                requestURI.startsWith("/v3/api-docs") ||
+                requestURI.startsWith("/swagger-resources") ||
+                requestURI.startsWith("/webjars") ||
+                requestURI.equals("/swagger-ui.html")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
         if (requestURI.startsWith("/members/signup") || requestURI.startsWith("/members/login")) {
             chain.doFilter(request, response);
             return;

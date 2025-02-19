@@ -1,7 +1,7 @@
 package com.example.sparta_3rd_newsfeed.friend.service;
 
-import com.example.sparta_3rd_newsfeed.Member;
-import com.example.sparta_3rd_newsfeed.MemberRepository;
+import com.example.sparta_3rd_newsfeed.member.entity.Member;
+import com.example.sparta_3rd_newsfeed.member.repository.MemberRepository;
 import com.example.sparta_3rd_newsfeed.friend.entity.FriendStatus;
 import com.example.sparta_3rd_newsfeed.friend.dto.request.StatusUpdateRequestDto;
 import com.example.sparta_3rd_newsfeed.friend.dto.response.FriendResponseDto;
@@ -84,7 +84,7 @@ public class FriendService {
             friends = friendRepository.findByReceiver(receiver.getId(), pageable);
         }
 
-        Page<FriendResponseDto> friendsDto = friends.map(f -> new FriendResponseDto(f.getId(), f.getSender().getId(), f.getSender().getMemberName(), f.getSender().getEmail()));
+        Page<FriendResponseDto> friendsDto = friends.map(f -> new FriendResponseDto(f.getId(), f.getSender().getId(), f.getSender().getUsername(), f.getSender().getEmail()));
 
         return new PageResponseDto<>(friendsDto);
     }
@@ -102,7 +102,7 @@ public class FriendService {
             friends = friendRepository.findBySender(sender.getId(), pageable);
         }
 
-        Page<FriendResponseDto> friendsDto = friends.map(f -> new FriendResponseDto(f.getId(), f.getReceiver().getId(), f.getReceiver().getMemberName(), f.getReceiver().getEmail()));
+        Page<FriendResponseDto> friendsDto = friends.map(f -> new FriendResponseDto(f.getId(), f.getReceiver().getId(), f.getReceiver().getUsername(), f.getReceiver().getEmail()));
 
         return new PageResponseDto<>(friendsDto);
     }

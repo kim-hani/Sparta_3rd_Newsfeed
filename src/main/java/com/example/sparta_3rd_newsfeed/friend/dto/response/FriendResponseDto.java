@@ -15,7 +15,7 @@ public class FriendResponseDto {
     public FriendResponseDto(Friend friend) {
         this.id = friend.getId();
         this.memberId = friend.getSender().getId();
-        this.name = friend.getSender().getMemberName();
+        this.name = friend.getSender().getUsername();
         this.email = friend.getSender().getEmail();
     }
 }
